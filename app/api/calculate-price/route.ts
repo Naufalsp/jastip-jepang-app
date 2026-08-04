@@ -9,7 +9,6 @@ interface PricingPayload {
 }
 
 // FUNGSI PEMBULATAN KE ATAS KE RIBUAN TERDEKAT
-// Contoh: Rp 12.100 -> Rp 13.000, Rp 5.500.200 -> Rp 5.501.000
 const roundUpToThousand = (val: number) => Math.ceil(val / 1000) * 1000;
 
 export async function POST(request: Request) {
@@ -26,41 +25,48 @@ export async function POST(request: Request) {
 
     let itemsPriceIdr = 0;
     let jastipFeeIdr = 0;
-    let transportFeeIdr = 0; // Biaya Transport Tambahan
+    let transportFeeIdr = 0;
     let shippingFeeIdr = 0;
 
     // 2. SKEMA TITIP BELI
     if (normalizedType.includes('BELI')) {
       if (items && items.length > 0) {
+        let rawJastipFeeTotal = 0;
+        let totalJpy = 0;
+
         items.forEach((item) => {
           const priceOriginal = Number(item.priceOriginal) || 0;
           const qty = Number(item.quantity) || 1;
 
-          // Konversi & Pembulatan Harga Barang
-          const priceInIdr = roundUpToThousand(
-            route === 'JP_TO_ID' ? priceOriginal * exchangeRateUsed : priceOriginal
-          );
+          // Akumulasi total Yen
+          totalJpy += priceOriginal * qty;
 
-          // Hitung Tiering Fee Jastip per Item
+          // Hitung Tiering Fee Jastip per Item (berdasarkan estimasi IDR per item)
+          const itemPriceInIdr = priceOriginal * exchangeRateUsed;
           let rawFee = 0;
-          if (priceInIdr > 0) {
-            if (priceInIdr <= 100000) rawFee = priceInIdr * 0.30;
-            else if (priceInIdr <= 500000) rawFee = priceInIdr * 0.20;
-            else if (priceInIdr <= 1000000) rawFee = priceInIdr * 0.10;
-            else rawFee = priceInIdr * 0.07;
+          if (itemPriceInIdr > 0) {
+            if (itemPriceInIdr <= 100000) rawFee = itemPriceInIdr * 0.30;
+            else if (itemPriceInIdr <= 500000) rawFee = itemPriceInIdr * 0.20;
+            else if (itemPriceInIdr <= 1000000) rawFee = itemPriceInIdr * 0.10;
+            else rawFee = itemPriceInIdr * 0.07;
           }
 
-          const feeInIdr = roundUpToThousand(rawFee);
-
-          itemsPriceIdr += priceInIdr * qty;
-          jastipFeeIdr += feeInIdr * qty;
+          rawJastipFeeTotal += rawFee * qty;
         });
 
-        // Hitung Biaya Transport Flat Rate 300 Yen
-        const TRANSPORT_JYP = 100;
-        transportFeeIdr = roundUpToThousand(
-          route === 'JP_TO_ID' ? TRANSPORT_JYP * exchangeRateUsed : TRANSPORT_JYP
+        // 1. Total Harga Barang (Konversi total Yen & Bulatkan)
+        itemsPriceIdr = roundUpToThousand(
+          route === 'JP_TO_ID' ? totalJpy * exchangeRateUsed : totalJpy
         );
+
+        // 2. Hitung Biaya Transport (100 JPY)
+        const TRANSPORT_JPY = 100;
+        transportFeeIdr = roundUpToThousand(
+          route === 'JP_TO_ID' ? TRANSPORT_JPY * exchangeRateUsed : TRANSPORT_JPY
+        );
+
+        // 3. Fee Jastip (Bulatkan Fee Tiering + Gabungkan Transport Fee agar presisi dengan Admin)
+        jastipFeeIdr = roundUpToThousand(rawJastipFeeTotal) + transportFeeIdr;
       }
       shippingFeeIdr = 0; // Titip Beli tanpa ongkir bagasi
     } 
@@ -76,17 +82,17 @@ export async function POST(request: Request) {
     }
 
     // 4. Total Pelunasan (Full Payment)
-    const subtotalItemsIdr = itemsPriceIdr + jastipFeeIdr + transportFeeIdr;
+    const subtotalItemsIdr = itemsPriceIdr + jastipFeeIdr;
     const totalPriceIdr = roundUpToThousand(subtotalItemsIdr + shippingFeeIdr);
 
     return NextResponse.json({
       exchangeRateUsed,
       itemsPriceIdr,
-      jastipFeeIdr,
-      transportFeeIdr, // Nilai Rp dari 100 yen
+      jastipFeeIdr,     // Fee Jastip sudah termasuk Biaya Transport (100 JPY)
+      transportFeeIdr,  // Nilai nominal transport fee (Rp 13.000)
       subtotalItemsIdr,
       shippingFeeIdr,
-      totalPriceIdr // Full payment 100%
+      totalPriceIdr     // Total Pelunasan
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Pricing calculation failed' }, { status: 500 });

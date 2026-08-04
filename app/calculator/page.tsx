@@ -6,7 +6,7 @@ import Link from 'next/link';
 // Interface Tipe Data Item
 interface CalcItem {
   item_name: string;
-  price_jpy: number | string; // Mengizinkan string kosong agar input tidak error
+  price_jpy: number | string;
   quantity: number;
 }
 
@@ -42,35 +42,43 @@ export default function PriceCalculatorPage() {
   // KALKULASI HARGA
   let totalItemsPriceIdr = 0;
   let totalJastipFeeIdr = 0;
-  let transportFeeIdr = 0; // Biaya Handling/Transport (Dipisah)
+  let transportFeeIdr = 0;
   let shippingFeeIdr = 0;
 
   if (orderType === 'TITIP_BELI') {
     if (items && items.length > 0) {
+      let rawJastipFeeTotal = 0;
+      let totalJpy = 0;
+
       items.forEach((item) => {
         const priceJpy = Number(item.price_jpy) || 0;
         const qty = Number(item.quantity) || 1;
 
-        // Konversi & Pembulatan Harga Barang per unit
-        const priceInIdr = roundUpToThousand(priceJpy * EFFECTIVE_RATE);
+        // Akumulasi total Yen
+        totalJpy += priceJpy * qty;
 
         // Hitung Tiering Fee Jastip per Item
+        const itemPriceInIdr = priceJpy * EFFECTIVE_RATE;
         let rawFee = 0;
-        if (priceInIdr > 0) {
-          if (priceInIdr <= 100000) rawFee = priceInIdr * 0.30;
-          else if (priceInIdr <= 500000) rawFee = priceInIdr * 0.20;
-          else if (priceInIdr <= 1000000) rawFee = priceInIdr * 0.10;
-          else rawFee = priceInIdr * 0.07;
+        if (itemPriceInIdr > 0) {
+          if (itemPriceInIdr <= 100000) rawFee = itemPriceInIdr * 0.30;
+          else if (itemPriceInIdr <= 500000) rawFee = itemPriceInIdr * 0.20;
+          else if (itemPriceInIdr <= 1000000) rawFee = itemPriceInIdr * 0.10;
+          else rawFee = itemPriceInIdr * 0.07;
         }
-        const feeInIdr = roundUpToThousand(rawFee);
 
-        totalItemsPriceIdr += priceInIdr * qty;
-        totalJastipFeeIdr += feeInIdr * qty;
+        rawJastipFeeTotal += rawFee * qty;
       });
 
-      // Biaya Transport / Handling (100 Yen)
+      // 1. Total Harga Barang (Konversi total Yen & Bulatkan)
+      totalItemsPriceIdr = roundUpToThousand(totalJpy * EFFECTIVE_RATE);
+
+      // 2. Biaya Transport / Handling (100 Yen)
       const TRANSPORT_JPY = 100;
       transportFeeIdr = roundUpToThousand(TRANSPORT_JPY * EFFECTIVE_RATE);
+
+      // 3. Fee Jastip (Bulatkan Fee Tiering + Gabungkan Transport Fee agar sama dengan Admin)
+      totalJastipFeeIdr = roundUpToThousand(rawJastipFeeTotal) + transportFeeIdr;
     }
     shippingFeeIdr = 0;
   } else {
@@ -85,8 +93,7 @@ export default function PriceCalculatorPage() {
   }
 
   // Total Pelunasan
-  const subtotalItemsIdr = totalItemsPriceIdr + totalJastipFeeIdr + transportFeeIdr;
-  const totalPriceIdr = roundUpToThousand(subtotalItemsIdr + shippingFeeIdr);
+  const totalPriceIdr = roundUpToThousand(totalItemsPriceIdr + totalJastipFeeIdr + shippingFeeIdr);
 
   return (
     <div className="max-w-2xl mx-auto my-6 sm:my-12 p-4 sm:p-6 bg-white border rounded-2xl shadow-sm space-y-6">
@@ -214,7 +221,7 @@ export default function PriceCalculatorPage() {
         </div>
       )}
 
-      {/* RINGKASAN RINCIAN BIAYA (FEES DIPISAHKAN) */}
+      {/* RINGKASAN RINCIAN BIAYA (SAMA DENGAN STRUKTUR ADMIN) */}
       <div className="bg-slate-50 p-4 rounded-xl space-y-2 border text-xs">
         <div className="font-bold text-slate-700 uppercase border-b pb-2 mb-2 tracking-wider text-[11px]">
           Rincian Perhitungan
@@ -223,25 +230,16 @@ export default function PriceCalculatorPage() {
         {orderType === 'TITIP_BELI' ? (
           <>
             <div className="flex justify-between text-slate-600">
-              <span>Total Harga Barang (IDR):</span>
+              <span>Harga Barang:</span>
               <span className="font-bold text-slate-900">
                 Rp {totalItemsPriceIdr.toLocaleString('id-ID')}
               </span>
             </div>
 
-            {/* DIPISAHKAN: FEE JASTIP */}
             <div className="flex justify-between text-slate-600">
-              <span>Fee Jastip (Tiering):</span>
+              <span>Fee Jastip:</span>
               <span className="font-bold text-slate-900">
                 Rp {totalJastipFeeIdr.toLocaleString('id-ID')}
-              </span>
-            </div>
-
-            {/* DIPISAHKAN: BIAYA HANDLING / TRANSPORT */}
-            <div className="flex justify-between text-slate-600">
-              <span>Biaya Handling / Transport (100 JPY):</span>
-              <span className="font-bold text-slate-900">
-                Rp {transportFeeIdr.toLocaleString('id-ID')}
               </span>
             </div>
           </>
@@ -255,7 +253,7 @@ export default function PriceCalculatorPage() {
         )}
 
         <div className="border-t pt-3 flex justify-between items-center font-black text-indigo-600">
-          <span className="text-xs sm:text-sm uppercase">Estimasi Total Pelunasan:</span>
+          <span className="text-xs sm:text-sm uppercase">Total Pelunasan:</span>
           <span className="text-base sm:text-lg">Rp {totalPriceIdr.toLocaleString('id-ID')}</span>
         </div>
       </div>
