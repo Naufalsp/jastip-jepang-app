@@ -19,16 +19,10 @@ export async function POST(request: Request) {
 
     const normalizedType = packageType.toString().toUpperCase();
 
-    // 1. Fetch live JPY rate dengan fallback
-    let exchangeRateUsed = 113.3;
-    try {
-      const rateRes = await fetch('https://open.er-api.com/v6/latest/JPY');
-      const rateData = await rateRes.json();
-      const baseJpyToIdr = rateData?.rates?.IDR || 110;
-      exchangeRateUsed = baseJpyToIdr * 1.03; // Margin 3%
-    } catch (e) {
-      console.warn("Gagal fetch kurs live, memakai fallback rate:", e);
-    }
+    // 1. SETTING KURS FLAT + MARGIN 3%
+    const BASE_FLAT_RATE = 116.505;
+    const MARGIN = 1.03; // Margin 3%
+    const exchangeRateUsed = BASE_FLAT_RATE * MARGIN; // Hasil: 120.00015
 
     let itemsPriceIdr = 0;
     let jastipFeeIdr = 0;
