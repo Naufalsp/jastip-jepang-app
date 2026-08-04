@@ -39,7 +39,6 @@ export default function AdminDashboard() {
 
   // Verifikasi Pembayaran Full Payment
   const handleVerifyPayment = async (orderId: string) => {
-    // 1. Cari data order yang sedang diverifikasi
     const targetOrder = orders.find((o) => o.id === orderId);
 
     if (!targetOrder) {
@@ -47,7 +46,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // 2. Update status pembayaran ke 'fully_paid'
     const { error } = await supabase
       .from('orders')
       .update({ payment_status: 'fully_paid' })
@@ -58,7 +56,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    // 3. Kirim Notifikasi WhatsApp Otomatis ke Customer
+    // Kirim Notifikasi WhatsApp Otomatis ke Customer
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     const trackingUrl = `${baseUrl}/order/${targetOrder.order_number}`;
 
@@ -83,11 +81,10 @@ export default function AdminDashboard() {
       alert('Pembayaran diverifikasi, tetapi pesan WA gagal terkirim.');
     }
 
-    // 4. Refresh data di layar Admin
     fetchOrders();
   };
 
-  // Update Status Ketersediaan Barang (dalam_pengecekan / tersedia / tidak_ada_stok)
+  // Update Status Ketersediaan Barang
   const handleUpdateAvailability = async (orderId: string, status: string) => {
     const { error } = await supabase
       .from('orders')
@@ -138,259 +135,341 @@ export default function AdminDashboard() {
     }
   };
 
+  // KETEGORI PENYARINGAN PESANAN
+  const checkIsTitipBeli = (ord: any) => {
+    const typeValue = (ord.package_type || ord.order_type || '').toString().toLowerCase().trim();
+    return typeValue.includes('beli') || typeValue === '';
+  };
+
+  const checkIsTitipKirim = (ord: any) => {
+    const typeValue = (ord.package_type || ord.order_type || '').toString().toLowerCase().trim();
+    return typeValue.includes('kirim');
+  };
+
+  // JUMLAH UTK DITAMPILKAN DI PADA BUTTON TAB FILTER
+  const totalAll = orders.length;
+  const totalTitipBeli = orders.filter(checkIsTitipBeli).length;
+  const totalTitipKirim = orders.filter(checkIsTitipKirim).length;
+
   const filteredOrders = orders.filter((ord) => {
     if (filterPackageType === 'ALL') return true;
-    const typeValue = (ord.package_type || ord.order_type || '').toString().toLowerCase().trim();
-    if (filterPackageType === 'TITIP_BELI') return typeValue.includes('beli') || typeValue === '';
-    if (filterPackageType === 'TITIP_KIRIM') return typeValue.includes('kirim');
+    if (filterPackageType === 'TITIP_BELI') return checkIsTitipBeli(ord);
+    if (filterPackageType === 'TITIP_KIRIM') return checkIsTitipKirim(ord);
     return true;
   });
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border">
+    <div className="min-h-screen bg-slate-100 p-3 sm:p-6 pb-20">
+      <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+        
+        {/* Header Dashboard */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 sm:p-6 rounded-2xl shadow-sm border gap-3">
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Dashboard Admin Jastip</h1>
-            <p className="text-sm text-slate-500">Kelola status ketersediaan barang dan kunci harga.</p>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900">Dashboard Admin Jastip</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Kelola status ketersediaan barang &amp; kunci harga.</p>
           </div>
-          <button onClick={fetchOrders} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">
+          <button 
+            onClick={fetchOrders} 
+            className="w-full sm:w-auto px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold active:scale-95 transition text-center"
+          >
             🔄 Refresh Data
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-lg font-bold text-slate-800">Daftar Pesanan Masuk</h2>
-
-            {/* Filter Tab */}
-            <div className="flex gap-2 mb-4 bg-slate-200 p-1 rounded-xl w-fit">
-              <button
-                type="button"
-                onClick={() => setFilterPackageType('ALL')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg ${filterPackageType === 'ALL' ? 'bg-white text-slate-900' : 'text-slate-600'}`}
-              >
-                Semua ({orders.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterPackageType('TITIP_BELI')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg ${filterPackageType === 'TITIP_BELI' ? 'bg-white text-indigo-600' : 'text-slate-600'}`}
-              >
-                🛒 Titip Beli
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterPackageType('TITIP_KIRIM')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg ${filterPackageType === 'TITIP_KIRIM' ? 'bg-white text-indigo-600' : 'text-slate-600'}`}
-              >
-                📦 Titip Kirim
-              </button>
-            </div>
-
-            {loading ? (
-              <p className="p-8 text-center bg-white rounded-xl border text-slate-400">Memuat data...</p>
-            ) : filteredOrders.map((ord) => (
-              <div key={ord.id} className="bg-white p-5 rounded-xl border shadow-sm space-y-3">
-                <div className="flex justify-between items-start border-b pb-3">
-                  <div>
-                    <span className="font-mono text-xs font-bold text-slate-400">{ord.order_number}</span>
-                    <h3 className="font-bold text-slate-900 text-lg">{ord.customer_name || 'Tanpa Nama'}</h3>
-                    <p className="text-xs text-slate-500">Whatsapp: {ord.whatsapp_number}</p>
-                    <p className="text-xs text-slate-500">Alamat Penerima: {ord.shipping_address}</p>
-                  </div>
-
-                  <div className="text-right space-y-1">
-                    {/* Select Status Ketersediaan Barang */}
-                    <select
-                      value={ord.order_status || 'dalam_pengecekan'}
-                      onChange={(e) => handleUpdateAvailability(ord.id, e.target.value)}
-                      className="text-xs border font-bold rounded-lg px-2 py-1 bg-slate-50"
-                    >
-                      <option value="dalam_pengecekan">⌛ Dalam Pengecekan</option>
-                      <option value="tersedia">✓ Tersedia</option>
-                      <option value="tidak_ada_stok">✕ Tidak Ada Stok</option>
-                    </select>
-
-                    <p className="text-xs font-bold text-indigo-600 uppercase">
-                      {(ord.payment_status || 'UNPAID').replace(/_/g, ' ')}
-                    </p>
-                  </div>
-                </div>
-
-                {/* --- DETAIL RINCIAN HARGA PADA CARD DOKUMEN --- */}
-                <div className="bg-slate-50 p-3 rounded-lg border space-y-1 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Harga Barang:</span>
-                    <span className="font-mono font-semibold">
-                      Rp {Number(ord.items_price_idr || 0).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-slate-600">
-                    <span>Fee Jastip:</span>
-                    <span className="font-mono font-semibold">
-                      Rp {Number(ord.jastip_fee_idr || 0).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-
-                  {ord.transport_fee_idr > 0 && (
-                    <div className="flex justify-between text-amber-700 font-medium">
-                      <span>Transport Lokal (¥300):</span>
-                      <span className="font-mono font-semibold">
-                        Rp {Number(ord.transport_fee_idr).toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  )}
-
-                  {ord.shipping_fee_idr > 0 && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Ongkir Bagasi:</span>
-                      <span className="font-mono font-semibold">
-                        Rp {Number(ord.shipping_fee_idr).toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between pt-2 border-t font-bold text-slate-900 text-sm">
-                    <span>Total Pelunasan:</span>
-                    <span className="text-indigo-600 font-black">
-                      Rp {Number(ord.total_price_idr || 0).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  {ord.payment_proof_url && (
-                    <a href={ord.payment_proof_url} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-sky-50 text-sky-700 text-xs font-bold rounded-lg border">
-                      👁️ Struk
-                    </a>
-                  )}
-
-                  {ord.payment_status === 'pending_verification' && (
-                    <button onClick={() => handleVerifyPayment(ord.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">
-                      ✓ Verifikasi Lunas
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setSelectedOrder(ord);
-                      const initialPrices: any = {};
-                      ord.order_items?.forEach((i: any) => { initialPrices[i.id] = i.price_original || ''; });
-                      setItemPrices(initialPrices);
-                      setTotalWeightKg(ord.total_weight_kg || 1);
-                    }}
-                    className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg"
-                  >
-                    ⚙️ Kelola Harga
-                  </button>
-                </div>
-              </div>
-            ))}
+        {/* Filter Tab Kategori (Mobile-Friendly Horizontal Scroll) */}
+        <div className="bg-white p-2 rounded-2xl border shadow-sm">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setFilterPackageType('ALL')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                filterPackageType === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua ({totalAll})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterPackageType('TITIP_BELI')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                filterPackageType === 'TITIP_BELI'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              🛒 Titip Beli ({totalTitipBeli})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterPackageType('TITIP_KIRIM')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                filterPackageType === 'TITIP_KIRIM'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              📦 Titip Kirim ({totalTitipKirim})
+            </button>
           </div>
+        </div>
 
-          {/* Panel Konfirmasi Harga */}
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-xl border shadow-sm sticky top-6 space-y-4">
-              <h2 className="text-lg font-bold text-slate-900 border-b pb-3">Panel Konfirmasi Harga</h2>
+        {/* Daftar Pesanan Masuk */}
+        <div className="space-y-4">
+          <h2 className="text-base sm:text-lg font-bold text-slate-800 px-1">
+            Daftar Pesanan ({filteredOrders.length})
+          </h2>
 
-              {!selectedOrder ? (
-                <p className="text-xs text-slate-400 text-center py-12">
-                  Klik <span className="font-bold text-slate-700">⚙️ Kelola Harga</span> pada pesanan untuk memproses tagihan.
-                </p>
-              ) : (
-                <form onSubmit={handleFinalizeOrder} className="space-y-4">
-                  <div className="bg-slate-50 p-3 rounded-lg border">
-                    <p className="font-bold text-slate-900">{selectedOrder.order_number}</p>
-                    <p className="text-xs text-slate-500">{selectedOrder.customer_name}</p>
-                  </div>
+          {loading ? (
+            <div className="p-12 text-center bg-white rounded-2xl border text-slate-400 font-medium animate-pulse text-xs">
+              Memuat data pesanan...
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-2xl border text-slate-400 text-xs font-medium">
+              Tidak ada pesanan pada kategori ini.
+            </div>
+          ) : (
+            filteredOrders.map((ord) => {
+              const combinedJastipFee = Number(ord.jastip_fee_idr || 0) + Number(ord.transport_fee_idr || 0);
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Berat Bagasi Total (Kg)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={totalWeightKg}
-                      onChange={(e) => setTotalWeightKg(Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 text-sm font-bold"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2 border-t pt-2">
-                    <label className="block text-xs font-bold text-slate-700">Harga JPY Per Barang:</label>
-                    {selectedOrder.order_items?.map((item: any) => (
-                      <div key={item.id} className="bg-slate-50 p-2 rounded border space-y-1">
-                        <p className="text-xs font-bold">{item.item_name} ({item.quantity}x)</p>
-                        <input
-                          type="number"
-                          placeholder="Harga Yen"
-                          value={itemPrices[item.id] !== undefined ? itemPrices[item.id] : ''}
-                          onChange={(e) => setItemPrices({ ...itemPrices, [item.id]: e.target.value === '' ? '' : Number(e.target.value) })}
-                          className="w-full border rounded p-1.5 text-xs font-mono font-bold"
-                          required
-                        />
+              return (
+                <div key={ord.id} className="bg-white p-4 sm:p-5 rounded-2xl border shadow-sm space-y-3">
+                  {/* Header Card Pesanan */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2 border-b pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-slate-400">{ord.order_number}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
+                          checkIsTitipKirim(ord) ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                        }`}>
+                          {checkIsTitipKirim(ord) ? 'Titip Kirim' : 'Titip Beli'}
+                        </span>
                       </div>
-                    ))}
+                      <h3 className="font-bold text-slate-900 text-base sm:text-lg mt-0.5">{ord.customer_name || 'Tanpa Nama'}</h3>
+                      <p className="text-xs text-slate-500">WA: <span className="font-semibold text-slate-700">{ord.whatsapp_number}</span></p>
+                      {ord.shipping_address && (
+                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">Alamat: {ord.shipping_address}</p>
+                      )}
+                    </div>
+
+                    {/* Status Select & Payment Badge */}
+                    <div className="w-full sm:w-auto flex sm:flex-col justify-between items-center sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
+                      <select
+                        value={ord.order_status || 'dalam_pengecekan'}
+                        onChange={(e) => handleUpdateAvailability(ord.id, e.target.value)}
+                        className="text-xs border font-bold rounded-xl px-2.5 py-1.5 bg-slate-50 text-slate-800 cursor-pointer"
+                      >
+                        <option value="dalam_pengecekan">⌛ Dalam Pengecekan</option>
+                        <option value="tersedia">✓ Tersedia</option>
+                        <option value="tidak_ada_stok">✕ Tidak Ada Stok</option>
+                      </select>
+
+                      <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-lg ${
+                        ord.payment_status === 'fully_paid' 
+                          ? 'bg-emerald-100 text-emerald-800' 
+                          : ord.payment_status === 'pending_verification'
+                          ? 'bg-amber-100 text-amber-800 animate-pulse'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {(ord.payment_status || 'UNPAID').replace(/_/g, ' ')}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* --- RINCIAN KALKULASI TAGIHAN DI PANEL KANAN --- */}
-                  <div className="bg-slate-50 p-3 rounded-lg border space-y-1 text-xs">
-                    <p className="font-bold text-slate-700 border-b pb-1 mb-2 uppercase text-[10px] tracking-wider">
-                      Rincian Tagihan Saat Ini
-                    </p>
-
+                  {/* Ringkasan Biaya Tagihan */}
+                  <div className="bg-slate-50 p-3 rounded-xl border space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-600">
-                      <span>Total Harga Barang:</span>
+                      <span>Harga Barang:</span>
                       <span className="font-mono font-semibold">
-                        Rp {Number(selectedOrder.items_price_idr || 0).toLocaleString('id-ID')}
+                        Rp {Number(ord.items_price_idr || 0).toLocaleString('id-ID')}
                       </span>
                     </div>
 
                     <div className="flex justify-between text-slate-600">
                       <span>Fee Jastip:</span>
                       <span className="font-mono font-semibold">
-                        Rp {Number(selectedOrder.jastip_fee_idr || 0).toLocaleString('id-ID')}
+                        Rp {combinedJastipFee.toLocaleString('id-ID')}
                       </span>
                     </div>
 
-                    {selectedOrder.transport_fee_idr > 0 && (
-                      <div className="flex justify-between text-amber-700 font-medium">
-                        <span>Transport (¥300):</span>
-                        <span className="font-mono font-semibold">
-                          Rp {Number(selectedOrder.transport_fee_idr).toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                    )}
-
-                    {selectedOrder.shipping_fee_idr > 0 && (
+                    {ord.shipping_fee_idr > 0 && (
                       <div className="flex justify-between text-slate-600">
-                        <span>Ongkir Bagasi:</span>
+                        <span>Ongkir / Bagasi:</span>
                         <span className="font-mono font-semibold">
-                          Rp {Number(selectedOrder.shipping_fee_idr).toLocaleString('id-ID')}
+                          Rp {Number(ord.shipping_fee_idr).toLocaleString('id-ID')}
                         </span>
                       </div>
                     )}
 
-                    <div className="flex justify-between pt-2 border-t font-black text-slate-900 text-sm">
-                      <span>Total Tagihan:</span>
-                      <span className="text-indigo-600">
-                        Rp {Number(selectedOrder.total_price_idr || 0).toLocaleString('id-ID')}
+                    <div className="flex justify-between pt-2 border-t font-bold text-slate-900 text-sm">
+                      <span>Total Pelunasan:</span>
+                      <span className="text-indigo-600 font-black">
+                        Rp {Number(ord.total_price_idr || 0).toLocaleString('id-ID')}
                       </span>
                     </div>
                   </div>
 
-                  <button type="submit" disabled={submitting} className="w-full bg-indigo-600 text-white font-bold text-xs py-3 rounded-lg">
-                    {submitting ? 'Memproses...' : '⚡ Kunci Harga & Set status TERSEDIA'}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
+                  {/* Tombol Aksi */}
+                  <div className="flex flex-wrap justify-end gap-2 pt-1">
+                    {ord.payment_proof_url && (
+                      <a 
+                        href={ord.payment_proof_url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="flex-1 sm:flex-initial text-center px-3 py-2 bg-sky-50 text-sky-700 text-xs font-bold rounded-xl border hover:bg-sky-100 transition"
+                      >
+                        👁️ Struk
+                      </a>
+                    )}
+
+                    {ord.payment_status === 'pending_verification' && (
+                      <button 
+                        onClick={() => handleVerifyPayment(ord.id)} 
+                        className="flex-1 sm:flex-initial px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 active:scale-95 transition"
+                      >
+                        ✓ Verifikasi Lunas
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setSelectedOrder(ord);
+                        const initialPrices: any = {};
+                        ord.order_items?.forEach((i: any) => { initialPrices[i.id] = i.price_original || ''; });
+                        setItemPrices(initialPrices);
+                        setTotalWeightKg(ord.total_weight_kg || 1);
+                      }}
+                      className="flex-1 sm:flex-initial px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 active:scale-95 transition"
+                    >
+                      ⚙️ Kelola Harga
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
+
+      {/* MODAL POPUP / BOTTOM SHEET KELOLA HARGA (TAMPIL HANYA JIKA DIBUKA) */}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-200">
+            
+            {/* Header Modal */}
+            <div className="flex justify-between items-center p-4 border-b">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Kelola &amp; Kunci Harga</h3>
+                <p className="text-xs text-slate-500 font-mono">{selectedOrder.order_number} - {selectedOrder.customer_name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body Modal (Scrollable) */}
+            <form onSubmit={handleFinalizeOrder} className="p-4 overflow-y-auto space-y-4 flex-1">
+              {/* Berat Bagasi Total */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Berat Bagasi Total (Kg)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  value={totalWeightKg}
+                  onChange={(e) => setTotalWeightKg(Number(e.target.value))}
+                  className="w-full border rounded-xl p-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              {/* Input Harga JPY per Barang */}
+              <div className="space-y-2 border-t pt-3">
+                <label className="block text-xs font-bold text-slate-700">Harga JPY Per Barang:</label>
+                {selectedOrder.order_items?.map((item: any) => (
+                  <div key={item.id} className="bg-slate-50 p-3 rounded-xl border space-y-1.5">
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs font-bold text-slate-900">{item.item_name}</p>
+                      <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-bold">{item.quantity}x</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">¥</span>
+                      <input
+                        type="number"
+                        placeholder="Harga Yen"
+                        value={itemPrices[item.id] !== undefined ? itemPrices[item.id] : ''}
+                        onChange={(e) => setItemPrices({ ...itemPrices, [item.id]: e.target.value === '' ? '' : Number(e.target.value) })}
+                        className="w-full border rounded-lg p-2 pl-7 text-xs font-mono font-bold text-slate-900 bg-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Rincian Tagihan Saat Ini dalam Modal */}
+              <div className="bg-slate-50 p-3 rounded-xl border space-y-1.5 text-xs">
+                <p className="font-bold text-slate-700 border-b pb-1 uppercase text-[10px] tracking-wider">
+                  Rincian Tagihan Saat Ini
+                </p>
+
+                <div className="flex justify-between text-slate-600">
+                  <span>Total Harga Barang:</span>
+                  <span className="font-mono font-semibold">
+                    Rp {Number(selectedOrder.items_price_idr || 0).toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                <div className="flex justify-between text-slate-600">
+                  <span>Fee Jastip:</span>
+                  <span className="font-mono font-semibold">
+                    Rp {(Number(selectedOrder.jastip_fee_idr || 0) + Number(selectedOrder.transport_fee_idr || 0)).toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                {selectedOrder.shipping_fee_idr > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Ongkir Bagasi:</span>
+                    <span className="font-mono font-semibold">
+                      Rp {Number(selectedOrder.shipping_fee_idr).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-2 border-t font-black text-slate-900 text-sm">
+                  <span>Total Tagihan:</span>
+                  <span className="text-indigo-600">
+                    Rp {Number(selectedOrder.total_price_idr || 0).toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer Tombol Submit */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="w-1/3 py-3 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl shadow-sm transition disabled:opacity-50"
+                >
+                  {submitting ? 'Memproses...' : '⚡ Kunci Harga & Set TERSEDIA'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
