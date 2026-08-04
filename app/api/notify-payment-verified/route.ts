@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const { orderNumber, customerName, whatsappNumber, totalPriceIdr } = body;
 
     if (whatsappNumber) {
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://domainingkamu.com';
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jastip-jepang-app.netlify.app';
       const trackingUrl = `${baseUrl}/order/${orderNumber}`;
       const totalFormatted = Number(totalPriceIdr || 0).toLocaleString('id-ID');
 

@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
     // 7. Kirim Notifikasi WhatsApp Otomatis ke Customer
     if (orderData.whatsapp_number) {
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://domainingkamu.com';
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jastip-jepang-app.netlify.app';
       const trackingUrl = `${baseUrl}/order/${orderData.order_number}`;
       const totalFormatted = totalPriceIdr.toLocaleString('id-ID');
 

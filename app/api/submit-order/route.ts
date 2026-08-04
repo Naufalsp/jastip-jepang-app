@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     if (itemsError) throw itemsError;
 
     // 3. Kirim WhatsApp Konfirmasi ke Customer
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://domainingkamu.com';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jastip-jepang-app.netlify.app';
     const trackingUrl = `${baseUrl}/order/${orderNumber}`;
 
     const waMessage = `Halo Kak ${customerName}! 👋
