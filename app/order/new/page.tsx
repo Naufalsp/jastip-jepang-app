@@ -166,7 +166,7 @@ export default function NewOrderPage() {
         {/* Daftar Barang */}
         <div className="space-y-3 border-t pt-4">
           <label className="block text-xs font-bold text-slate-700 uppercase">Daftar Barang Titipan</label>
-          <p>Cantumkan nama produk, link yang menampilkan nama lengkap produk atau fotonya untuk mempermudah pencarian!</p>
+          <p className="text-xs text-slate-500">Cantumkan nama produk, link yang menampilkan nama lengkap produk atau fotonya untuk mempermudah pencarian!</p>
           
           {items.map((item, idx) => (
             <div key={idx} className="flex gap-2 items-center">
