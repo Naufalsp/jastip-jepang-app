@@ -1,4 +1,3 @@
-// app/order/[order_number]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -114,6 +113,9 @@ export default function OrderTrackingPortal() {
     </div>
   );
 
+  // MENGGABUNGKAN FEE JASTIP DENGAN HANDLING FEE
+  const combinedJastipFee = Number(order.jastip_fee_idr || 0) + Number(order.transport_fee_idr || 0);
+
   return (
     <div className="max-w-4xl mx-auto my-12 p-6 bg-white border rounded-xl shadow-sm space-y-6">
       {/* Header Info */}
@@ -144,22 +146,13 @@ export default function OrderTrackingPortal() {
               </span>
             </div>
 
+            {/* Jasa Titip (Gabungan Fee Jastip + Handling Fee) */}
             <div className="flex justify-between">
               <span>Jasa Titip (Fee Jastip):</span>
               <span className="font-mono font-semibold">
-                Rp {Number(order.jastip_fee_idr || 0).toLocaleString('id-ID')}
+                Rp {combinedJastipFee.toLocaleString('id-ID')}
               </span>
             </div>
-
-            {/* TAMPILKAN BIAYA TRANSPORT JIKA ADA */}
-            {order.transport_fee_idr > 0 && (
-              <div className="flex justify-between text-amber-700">
-                <span>Service Handling Fee (¥300):</span>
-                <span className="font-mono font-semibold">
-                  Rp {Number(order.transport_fee_idr).toLocaleString('id-ID')}
-                </span>
-              </div>
-            )}
 
             {order.shipping_fee_idr > 0 && (
               <div className="flex justify-between">

@@ -70,7 +70,7 @@ export default function NewOrderPage() {
   return (
     <div className="max-w-2xl mx-auto my-12 p-6 bg-white border rounded-xl shadow-sm space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-900">Form Pesanan Jastip Jepang</h1>
+        <h1 className="text-2xl font-black text-slate-900">Form Pesanan Jastip Jepang AMIHSORIH</h1>
         <p className="text-xs text-slate-500">Isi detail pesanan kamu di bawah ini.</p>
       </div>
 
@@ -119,13 +119,13 @@ export default function NewOrderPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Nomor WhatsApp</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Nomor WhatsApp (Pakai kode +62 atau +81)</label>
             <input
               type="text"
               required
               value={whatsappNumber}
               onChange={(e) => setWhatsappNumber(e.target.value)}
-              placeholder="Contoh: 08123456789 atau +628123456789"
+              placeholder="Contoh: +628123456789 atau +818023456789"
               className="w-full border rounded-lg p-2.5 text-sm font-medium"
             />
           </div>

@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         });
 
         // Hitung Biaya Transport Flat Rate 300 Yen
-        const TRANSPORT_JYP = 300;
+        const TRANSPORT_JYP = 100;
         transportFeeIdr = roundUpToThousand(
           route === 'JP_TO_ID' ? TRANSPORT_JYP * exchangeRateUsed : TRANSPORT_JYP
         );
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       exchangeRateUsed,
       itemsPriceIdr,
       jastipFeeIdr,
-      transportFeeIdr, // Nilai Rp dari 300 yen
+      transportFeeIdr, // Nilai Rp dari 100 yen
       subtotalItemsIdr,
       shippingFeeIdr,
       totalPriceIdr // Full payment 100%

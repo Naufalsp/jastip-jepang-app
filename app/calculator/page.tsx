@@ -60,7 +60,7 @@ export default function PriceCalculatorPage() {
     });
 
     // Transport Flat 300 Yen
-    const TRANSPORT_JPY = 300;
+    const TRANSPORT_JPY = 100;
     transportFeeIdr = roundUpToThousand(TRANSPORT_JPY * EFFECTIVE_RATE);
   } else {
     // Titip Kirim
@@ -201,7 +201,7 @@ export default function PriceCalculatorPage() {
               <span className="font-bold">Rp {totalJastipFeeIdr.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between text-slate-600">
-              <span>Biaya Transport Lokal JPY (300 Yen):</span>
+              <span>Biaya Handling:</span>
               <span className="font-bold">Rp {transportFeeIdr.toLocaleString('id-ID')}</span>
             </div>
           </>
