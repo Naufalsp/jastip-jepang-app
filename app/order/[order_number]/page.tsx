@@ -2,282 +2,140 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-export default function OrderTrackingPortal() {
+export default function CustomerOrderDetailPage() {
   const params = useParams();
-  const orderNumber = params?.order_number as string;
-
   const [order, setOrder] = useState<any>(null);
-  const [uploading, setUploading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [revisedItems, setRevisedItems] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchOrder() {
-      if (!orderNumber) return;
-
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('order_number', orderNumber)
-        .single();
-
-      if (error) {
-        console.error("Error fetching order:", error);
-      }
-
-      if (data) setOrder(data);
-    }
-
     fetchOrder();
-  }, [orderNumber]);
+  }, []);
 
-  const handleUploadReceipt = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file || !order) return;
-
-    setUploading(true);
-    try {
-      // 1. Unggah file struk ke Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${order.order_number}-${Date.now()}.${fileExt}`;
-      const filePath = `receipts/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('payment-receipts')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('payment-receipts')
-        .getPublicUrl(filePath);
-      const publicUrl = urlData.publicUrl;
-
-      // 2. Update status pembayaran ke 'pending_verification'
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ 
-          payment_proof_url: publicUrl,
-          payment_status: 'pending_verification'
-        })
-        .eq('id', order.id);
-
-      if (updateError) throw updateError;
-
-      // 3. Panggil API Notifikasi WA bahwa bukti bayar telah berhasil diunggah
-      try {
-        await fetch('/api/notify-payment-uploaded', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderNumber: order.order_number,
-            customerName: order.customer_name,
-            whatsappNumber: order.whatsapp_number,
-            totalPriceIdr: order.total_price_idr
-          })
-        });
-      } catch (waErr) {
-        console.warn("Gagal memicu notifikasi WA upload struk:", waErr);
-      }
-
-      alert('Bukti pembayaran berhasil dikirim! Admin akan segera memverifikasi.');
-      window.location.reload();
-    } catch (err: any) {
-      alert(err.message || 'Gagal mengunggah bukti transfer');
-    } finally {
-      setUploading(false);
+  const fetchOrder = async () => {
+    const res = await fetch(`/api/orders/detail?orderNumber=${params.order_number}`);
+    const data = await res.json();
+    setOrder(data);
+    if (data?.order_items) {
+      setRevisedItems(data.order_items);
     }
   };
 
-  // Helper Pemetaan Status Ketersediaan
-  const renderAvailabilityBadge = (status: string) => {
-    switch (status) {
-      case 'tersedia':
-        return <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-full text-xs uppercase">✓ Barang Tersedia</span>;
-      case 'tidak_ada_stok':
-        return <span className="px-3 py-1 bg-rose-100 text-rose-800 font-bold rounded-full text-xs uppercase">✕ Stok Tidak Ada / Habis</span>;
-      default:
-        return <span className="px-3 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-xs uppercase">⌛ Dalam Pengecekan Admin</span>;
+  const handleReorderOutOfStock = async () => {
+    const res = await fetch('/api/orders/revise-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: order.id, items: revisedItems })
+    });
+    if (res.ok) {
+      alert('Pengajuan revisi stok berhasil dikirim ke Admin!');
+      fetchOrder();
     }
   };
 
-  if (!order) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <p className="p-8 text-center text-slate-500 font-medium animate-pulse">Memuat data pesanan...</p>
-    </div>
-  );
-
-  // MENGGABUNGKAN FEE JASTIP DENGAN HANDLING FEE
-  const combinedJastipFee = Number(order.jastip_fee_idr || 0) + Number(order.transport_fee_idr || 0);
+  if (!order) return <div className="p-6 text-center text-xs font-bold">Loading detail order...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto my-12 p-6 bg-white border rounded-xl shadow-sm space-y-6">
-      {/* Header Info */}
-      <div className="flex flex-wrap justify-between items-center border-b pb-4 gap-2">
-        <div>
-          <span className="text-xs font-mono text-slate-400 uppercase">ORDER NUMBER</span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">{order.order_number}</h1>
-          <p className="text-xs text-slate-500 mt-1">Pemesan: <strong>{order.customer_name}</strong> ({order.whatsapp_number})</p>
-        </div>
-        <div className="text-right">
-          <span className="text-xs block font-bold text-slate-500 uppercase mb-1">Status Ketersediaan</span>
-          {renderAvailabilityBadge(order.order_status)}
-        </div>
+    <div className="max-w-xl mx-auto p-4 sm:p-6 my-6 bg-white border rounded-2xl shadow-sm space-y-6 text-slate-800">
+      <div className="border-b pb-3">
+        <h1 className="text-lg font-black text-slate-900">Pesanan #{order.order_number}</h1>
+        <p className="text-xs text-slate-500">Status: <span className="font-bold uppercase text-indigo-600">{order.order_status}</span></p>
       </div>
 
-      {/* Rincian Biaya & Form Upload */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl border">
-        {/* Detail Rincian Biaya */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Rincian Tagihan (Full Payment)</h3>
-          
-          {/* Rincian Tagihan */}
-          <div className="space-y-1.5 text-xs text-slate-600">
-            <div className="flex justify-between">
-              <span>Total Harga Barang:</span>
-              <span className="font-mono font-semibold">
-                Rp {Number(order.items_price_idr || 0).toLocaleString('id-ID')}
+      {/* Rincian Barang & Verifikasi Stok */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold text-slate-700 uppercase">Daftar Barang</h2>
+        {order.order_items?.map((item: any, idx: number) => (
+          <div key={item.id} className="p-3 border rounded-xl text-xs space-y-1">
+            <div className="flex justify-between font-bold">
+              <span>{item.item_name} x {item.quantity}</span>
+              <span className={item.availability_status === 'out_of_stock' ? 'text-rose-600' : 'text-emerald-600'}>
+                {item.availability_status === 'out_of_stock' ? '❌ Stok Kosong' : '✓ Tersedia'}
               </span>
             </div>
-
-            {/* Jasa Titip (Gabungan Fee Jastip + Handling Fee) */}
-            <div className="flex justify-between">
-              <span>Jasa Titip (Fee Jastip):</span>
-              <span className="font-mono font-semibold">
-                Rp {combinedJastipFee.toLocaleString('id-ID')}
-              </span>
-            </div>
-
-            {order.shipping_fee_idr > 0 && (
-              <div className="flex justify-between">
-                <span>Ongkir / Bagasi Bagian:</span>
-                <span className="font-mono font-semibold">
-                  Rp {Number(order.shipping_fee_idr || 0).toLocaleString('id-ID')}
-                </span>
+            
+            {/* Input Revisi jika Stok Kosong */}
+            {item.availability_status === 'out_of_stock' && order.order_status === 'perlu_revisi_stok' && (
+              <div className="mt-2 p-2 bg-rose-50 rounded-lg space-y-1">
+                <p className="text-[10px] text-rose-700 font-bold">Ubah Pengajuan Barang Ini:</p>
+                <input
+                  type="text"
+                  placeholder="Nama Barang Pengganti"
+                  className="w-full p-1 border rounded bg-white text-xs"
+                  value={revisedItems[idx]?.item_name || ''}
+                  onChange={(e) => {
+                    const updated = [...revisedItems];
+                    updated[idx].item_name = e.target.value;
+                    setRevisedItems(updated);
+                  }}
+                />
               </div>
             )}
-
-            <div className="flex justify-between pt-2 border-t text-sm font-black text-slate-900">
-              <span>Total Pelunasan:</span>
-              <span className="text-indigo-600">
-                Rp {Number(order.total_price_idr || 0).toLocaleString('id-ID')}
-              </span>
-            </div>
           </div>
+        ))}
 
-          <div className="pt-2">
-            <span className="text-xs text-slate-400 uppercase block">Status Pembayaran:</span>
-            <span className="text-sm font-bold text-indigo-600 capitalize">
-              {order.payment_status?.replace(/_/g, ' ') || 'UNPAID'}
-            </span>
-          </div>
-        </div>
-
-        {/* Kotak Upload Pembayaran */}
-        <div className="border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
-          {order.order_status === 'dalam_pengecekan' ? (
-            <div className="text-xs text-amber-700 bg-amber-50 p-4 rounded-lg border border-amber-200 font-medium space-y-1">
-              <p className="font-bold">⌛ Admin Sedang Mengecek Barang</p>
-              <p>Tombol pembayaran akan terbuka secara otomatis setelah status ketersediaan barang dikonfirmasi *Tersedia* oleh Admin.</p>
-            </div>
-          ) : order.order_status === 'tidak_ada_stok' ? (
-            <div className="text-xs text-rose-700 bg-rose-50 p-4 rounded-lg border border-rose-200 font-medium">
-              <p className="font-bold">✕ Stok Barang Habis / Tidak Ada</p>
-              <p>Mohon maaf, barang tidak dapat diproses karena tidak tersedia di toko Jepang.</p>
-            </div>
-          ) : order.payment_status === 'fully_paid' || order.payment_status === 'paid' ? (
-            /* TAMPILAN JIKA SUDAH DIVERIFIKASI LUNAS OLEH ADMIN */
-            <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center space-y-2">
-              <div className="w-10 h-10 bg-emerald-500 text-white font-bold text-lg rounded-full flex items-center justify-center mx-auto">
-                ✓
-              </div>
-              <p className="text-sm font-black text-emerald-900 uppercase tracking-wide">
-                Pembayaran Lunas
-              </p>
-              <p className="text-xs text-emerald-700">
-                Terima kasih! Bukti transfer kamu telah diverifikasi Admin. Pesanan kamu sedang diproses/disiapkan oleh tim Jepang.
-              </p>
-            </div>
-          ) : order.payment_status === 'pending_verification' ? (
-            /* TAMPILAN JIKA SUDAH UPLOAD STRUK TAPI BELUM VERIFIKASI ADMIN */
-            <div className="bg-amber-50 p-5 rounded-xl border border-amber-200 text-center space-y-2">
-              <div className="w-10 h-10 bg-amber-500 text-white font-bold text-lg rounded-full flex items-center justify-center mx-auto animate-pulse">
-                ⏳
-              </div>
-              <p className="text-sm font-bold text-amber-900 uppercase">
-                Menunggu Verifikasi Admin
-              </p>
-              <p className="text-xs text-amber-700">
-                Struk transfer sudah kami terima. Admin sedang mencocokkan mutasi rekening kamu.
-              </p>
-            </div>
-          ) : (
-            /* FORM UPLOAD STRUK (JIKA UNPAID) */
-            <form onSubmit={handleUploadReceipt} className="space-y-3">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Upload Bukti Pembayaran Lunas (Full Payment)
-              </label>
-              
-              <div>
-                <label 
-                  htmlFor="payment-proof-upload" 
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer transition"
-                >
-                  📁 Pilih File Struk Transfer
-                </label>
-                <input 
-                  id="payment-proof-upload"
-                  type="file" 
-                  accept="image/*" 
-                  required 
-                  onChange={e => setFile(e.target.files?.[0] || null)}
-                  className="hidden" 
-                />
-                {file && (
-                  <p className="text-xs text-emerald-600 font-semibold mt-1">
-                    ✓ File terpilih: {file.name}
-                  </p>
-                )}
-              </div>
-              
-              <button 
-                type="submit" 
-                disabled={uploading || !file}
-                className="w-full bg-emerald-600 text-white font-bold text-xs py-2.5 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
-              >
-                {uploading ? 'Mengirim Struk...' : 'Kirim Bukti Pembayaran Lunas'}
-              </button>
-            </form>
-          )}
-        </div>
+        {order.order_status === 'perlu_revisi_stok' && (
+          <button
+            onClick={handleReorderOutOfStock}
+            className="w-full py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold"
+          >
+            Kirim Ulang Revisi Barang Kosong →
+          </button>
+        )}
       </div>
 
-      {/* Manifest Barang */}
-      <div className="space-y-3">
-        <h3 className="font-bold text-slate-800 border-b pb-2 text-sm">Daftar Barang Bawaan / Titipan</h3>
-        {order.order_items && order.order_items.length > 0 ? (
-          order.order_items.map((item: any) => (
-            <div key={item.id} className="flex justify-between items-center p-3 border rounded-lg bg-white shadow-sm text-sm">
-              <div>
-                <p className="font-bold text-slate-900">{item.item_name}</p>
-                <p className="text-xs text-slate-400">Jumlah: {item.quantity}x</p>
-              </div>
-              <div className="text-right">
-                {item.price_original > 0 && (
-                  <p className="font-mono text-xs text-slate-400">¥{Number(item.price_original).toLocaleString()}</p>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-slate-400 italic">Tidak ada item rincian.</p>
-        )}
+      {/* RINCIAN BIAYA (HANYA MUNCUL JIKA HARGA DIINPUT ADMIN) */}
+      {order.total_price_idr > 0 && (
+        <div className="bg-slate-50 p-4 rounded-xl border text-xs space-y-2">
+          <div className="font-bold text-slate-700 uppercase border-b pb-2 text-[11px]">Rincian Pembayaran</div>
+          
+          <div className="flex justify-between">
+            <span>Total Harga Barang:</span>
+            <span className="font-bold">Rp {Number(order.items_price_idr).toLocaleString('id-ID')}</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span>Fee Jastip (Termasuk Transportasi Flat):</span>
+            <span className="font-bold">Rp {Number(order.jastip_fee_idr).toLocaleString('id-ID')}</span>
+          </div>
+
+          <div className="flex justify-between text-indigo-700 border-t pt-2 font-black text-sm">
+            <span>Harga Total (100%):</span>
+            <span>Rp {Number(order.total_price_idr).toLocaleString('id-ID')}</span>
+          </div>
+
+          <div className="flex justify-between text-emerald-700 bg-emerald-50 p-2.5 rounded-lg font-black text-xs">
+            <span>Wajib DP 75%:</span>
+            <span>Rp {Number(order.dp_amount_idr).toLocaleString('id-ID')}</span>
+          </div>
+        </div>
+      )}
+
+      {/* STATUS PAYMENTS */}
+      <div className="space-y-2 text-xs">
+        <div className="p-3 border rounded-xl flex justify-between items-center">
+          <div>
+            <p className="font-bold">Tahap 1: DP 75%</p>
+            <p className="text-[10px] text-slate-500">Rp {Number(order.dp_amount_idr).toLocaleString('id-ID')}</p>
+          </div>
+          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+            order.dp_payment_status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+          }`}>
+            {order.dp_payment_status}
+          </span>
+        </div>
+
+        <div className="p-3 border rounded-xl flex justify-between items-center">
+          <div>
+            <p className="font-bold">Tahap 2: Pelunasan Sisa 25%</p>
+            <p className="text-[10px] text-slate-500">Rp {(Number(order.total_price_idr) - Number(order.dp_amount_idr)).toLocaleString('id-ID')}</p>
+          </div>
+          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+            order.final_payment_status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {order.final_payment_status}
+          </span>
+        </div>
       </div>
     </div>
   );
