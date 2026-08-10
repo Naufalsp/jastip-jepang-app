@@ -1,131 +1,22 @@
 // // lib/whatsapp.ts
-
-// function formatPhoneNumber(phone: string): string {
-//   let cleaned = phone.replace(/\D/g, '');
-//   if (cleaned.startsWith('0')) {
-//     cleaned = '62' + cleaned.slice(1);
-//   }
-//   return cleaned;
-// }
-
-// export async function sendWhatsAppNotification(target: string, message: string) {
-//   const formattedTarget = formatPhoneNumber(target);
-//   const token = process.env.FONNTE_TOKEN;
-
-//   console.log('--- DEBUG WA FONNTE ---');
-//   console.log('Target Formatted:', formattedTarget);
-//   console.log('Token Exists?:', !!token);
-
-//   if (!token) {
-//     console.warn('FONNTE_TOKEN tidak ditemukan pada environment variables.');
-//     return { status: false, reason: 'Missing FONNTE_TOKEN' };
-//   }
-
-//   try {
-//     const formData = new FormData();
-//     formData.append('target', formattedTarget);
-//     formData.append('message', message);
-
-//     const response = await fetch('https://api.fonnte.com/send', {
-//       method: 'POST',
-//       headers: {
-//         'Authorization': token,
-//       },
-//       body: formData,
-//     });
-
-//     const result = await response.json();
-//     console.log('Fonnte Response:', result); // Cek log respons Fonnte di terminal server
-//     return result;
-//   } catch (error) {
-//     console.error('Error sending WhatsApp via Fonnte:', error);
-//     return null;
-//   }
-// }
-
-// // -------------------------------------------------------------
-// // HELPER TEMPLATE PESAN WA SESUAI 6 KONDISI
-// // -------------------------------------------------------------
-
-// const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://domain-kamu.com';
-
-// const formatRupiah = (val: number) => `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
-
-// export async function triggerWAOnStatusOrVerificationChange(
-//   order: any, 
-//   newStatus?: string, 
-//   actionType?: 'verify_dp' | 'verify_final' | 'status_change'
-// ) {
-//   if (!order?.whatsapp_number) {
-//     console.warn('Nomor WhatsApp tidak ditemukan pada objek order:', order);
-//     return;
-//   }
-
-//   const orderLink = `${BASE_URL}/order/${order.order_number}`;
-//   const customerName = order.customer_name || 'Customer';
-//   const orderNumber = order.order_number;
-//   const totalPriceFormatted = formatRupiah(order.total_price);
-//   const dpAmountFormatted = formatRupiah(order.dp_amount || Math.round((order.total_price || 0) * 0.75));
-
-//   let message = '';
-
-//   // KONDISI 2: Admin mengonfirmasi ketersediaan & harga
-//   if (
-//     actionType === 'status_change' && 
-//     (newStatus === 'menunggu_dp' || newStatus === 'tersedia' || newStatus === 'PRICED')
-//   ) {
-//     message = `Halo Kak ${customerName}! 🔔\n\nPesanan kamu *${orderNumber}* telah dikonfirmasi dan selesai dihitung oleh Admin!\n\nTotal Pelunasan yang perlu dibayarkan: *${totalPriceFormatted}*\nDP 75% Wajib: *${dpAmountFormatted}*\n\nSilakan lakukan pembayaran DP 75% terlebih dahulu atau langsung pelunasan. Silakan buka tautan berikut untuk melihat rincian lengkap & melakukan upload bukti pembayaran:\n${orderLink}\n\nTerima kasih! 💳`;
-//   }
-
-//   // KONDISI 3: Pembayaran DP diverifikasi ATAU barang disiapkan berangkat dari Jepang
-//   else if (
-//     actionType === 'verify_dp' || 
-//     newStatus === 'berangkat_dari_jepang' || 
-//     newStatus === 'dp_verified' ||
-//     newStatus === 'disiapkan'
-//   ) {
-//     message = `Halo Kak ${customerName}! 🔔\n\nPembayaran DP untuk pesanan kamu *${orderNumber}* telah diverifikasi!\n\nSaat ini barang kamu sedang disiapkan untuk dikirim ke Indonesia. Silakan buka tautan berikut untuk memantau status pesanan kamu:\n${orderLink}\n\nTerima kasih! 📦`;
-//   }
-
-//   // KONDISI 4: Barang tiba di Indonesia & diminta melunasi sisa tagihan
-//   else if (
-//     (actionType === 'status_change' && newStatus === 'tiba_di_indonesia') || 
-//     newStatus === 'arrived_indonesia'
-//   ) {
-//     const sisaPelunasan = formatRupiah((order.total_price || 0) - (order.dp_amount || 0));
-//     message = `Halo Kak ${customerName}! 🔔\n\nPesanan kamu *${orderNumber}* telah tiba di Indonesia!\n\nSisa pelunasan yang perlu dibayarkan: *${sisaPelunasan}*. Mohon segera lakukan pelunasan dan upload bukti pembayaran melalui tautan berikut agar pesanan bisa langsung dikirim:\n${orderLink}\n\nTerima kasih! ✈️`;
-//   }
-
-//   // KONDISI 5: Pembayaran dinyatakan LUNAS
-//   else if (actionType === 'verify_final' || newStatus === 'lunas' || newStatus === 'paid') {
-//     message = `Halo Kak ${customerName}! 🔔\n\nPembayaran untuk pesanan kamu *${orderNumber}* telah dinyatakan lunas!\n\nPesanan kamu akan segera diproses ke tahap pengiriman lokal ke alamat tujuan. Silakan cek rincian pesanan kamu di sini:\n${orderLink}\n\nTerima kasih! 💳`;
-//   }
-
-//   // KONDISI 6: Barang dikirim ke alamat customer
-//   else if (
-//     (actionType === 'status_change' && newStatus === 'diantar_ke_alamat') || 
-//     newStatus === 'shipped' || 
-//     newStatus === 'dikirim'
-//   ) {
-//     message = `Halo Kak ${customerName}! 🔔\n\nPesanan kamu *${orderNumber}* sedang dalam perjalanan ke alamat tujuan!\n\nKamu dapat melacak posisi paket dan melihat rincian pengiriman melalui tautan berikut:\n${orderLink}\n\nTerima kasih telah berbelanja! 🚚`;
-//   }
-
-//   // Debugging log jika pesan kosong
-//   if (!message) {
-//     console.warn(`[WA WARNING] Tidak ada template pesan yang cocok untuk actionType: "${actionType}" dan newStatus: "${newStatus}"`);
-//     return;
-//   }
-
-//   return await sendWhatsAppNotification(order.whatsapp_number, message);
-// }
-
-// lib/whatsapp.ts
-
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0')) {
-    cleaned = '62' + cleaned.slice(1);
+
+  // Jika diisi contoh: +818012345678 atau 818012345678 -> Biarkan 81
+  if (cleaned.startsWith('81') || cleaned.startsWith('62')) {
+    return cleaned;
   }
+
+  // Jika diisi format lokal Jepang (contoh: 08012345678 atau 09012345678)
+  if (cleaned.startsWith('080') || cleaned.startsWith('090') || cleaned.startsWith('070')) {
+    return '81' + cleaned.slice(1);
+  }
+
+  // Standar format lokal Indonesia (contoh: 08123456789)
+  if (cleaned.startsWith('0')) {
+    return '62' + cleaned.slice(1);
+  }
+
   return cleaned;
 }
 
