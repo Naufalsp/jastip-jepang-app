@@ -1,18 +1,29 @@
 // // lib/whatsapp.ts
 function formatPhoneNumber(phone: string): string {
+  if (!phone) return '';
+
   let cleaned = phone.replace(/\D/g, '');
 
-  // Jika diisi contoh: +818012345678 atau 818012345678 -> Biarkan 81
+  // 1. Jika sudah berawalan Kode Negara (62 atau 81)
   if (cleaned.startsWith('81') || cleaned.startsWith('62')) {
     return cleaned;
   }
 
-  // Jika diisi format lokal Jepang (contoh: 08012345678 atau 09012345678)
-  if (cleaned.startsWith('080') || cleaned.startsWith('090') || cleaned.startsWith('070')) {
+  // 2. Jika format lokal Jepang (contoh: 08012345678, 09012345678, 07012345678)
+  if (
+    cleaned.startsWith('080') || 
+    cleaned.startsWith('090') || 
+    cleaned.startsWith('070')
+  ) {
     return '81' + cleaned.slice(1);
   }
 
-  // Standar format lokal Indonesia (contoh: 08123456789)
+  // 3. Jika format lokal Indonesia (contoh: 08123456789, 085712345678)
+  if (cleaned.startsWith('08')) {
+    return '62' + cleaned.slice(1);
+  }
+
+  // 4. Jika hanya diawali angka 0 biasa
   if (cleaned.startsWith('0')) {
     return '62' + cleaned.slice(1);
   }
