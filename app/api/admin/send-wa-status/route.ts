@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nomor WhatsApp tidak ditemukan' }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://domain-kamu.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://https://jastipamihsorih.netlify.app';
     const orderLink = `${baseUrl}/order/${orderNumber}`;
     const formatRupiah = (val: number) => `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
 
