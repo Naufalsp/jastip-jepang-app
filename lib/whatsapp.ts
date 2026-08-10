@@ -1,5 +1,5 @@
 // // lib/whatsapp.ts
-function formatPhoneNumber(phone: string): string {
+export function formatPhoneNumber(phone: string): string {
   if (!phone) return '';
 
   let cleaned = phone.replace(/\D/g, '');
@@ -18,12 +18,7 @@ function formatPhoneNumber(phone: string): string {
     return '81' + cleaned.slice(1);
   }
 
-  // 3. Jika format lokal Indonesia (contoh: 08123456789, 085712345678)
-  if (cleaned.startsWith('08')) {
-    return '62' + cleaned.slice(1);
-  }
-
-  // 4. Jika hanya diawali angka 0 biasa
+  // 3. Jika format lokal Indonesia
   if (cleaned.startsWith('0')) {
     return '62' + cleaned.slice(1);
   }
@@ -35,18 +30,23 @@ export async function sendWhatsAppNotification(target: string, message: string) 
   const formattedTarget = formatPhoneNumber(target);
   const token = process.env.FONNTE_TOKEN;
 
-  console.log('--- DEBUG WA FONNTE ---');
-  console.log('Target Formatted:', formattedTarget);
-  console.log('Token Exists?:', !!token);
-
   if (!token) {
-    console.warn('FONNTE_TOKEN tidak ditemukan pada environment variables.');
+    console.error('[WA ERROR] FONNTE_TOKEN tidak ditemukan!');
     return { status: false, reason: 'Missing FONNTE_TOKEN' };
   }
 
   try {
     const formData = new FormData();
+    // Gunakan tanda '+' atau tentukan country code agar Fonnte tidak memaksa menambahkan 62
     formData.append('target', formattedTarget);
+    
+    // TENTUKAN COUNTRY DEFAULT AGAR FONNTE TIDAK OTOMATIS BIKIN '62' UNTUK NOMOR DEPAN 81
+    if (formattedTarget.startsWith('81')) {
+      formData.append('country', '81');
+    } else {
+      formData.append('country', '62');
+    }
+
     formData.append('message', message);
 
     const response = await fetch('https://api.fonnte.com/send', {
@@ -55,13 +55,13 @@ export async function sendWhatsAppNotification(target: string, message: string) 
         'Authorization': token,
       },
       body: formData,
+      cache: 'no-store',
     });
 
     const result = await response.json();
-    console.log('Fonnte Response:', result); // Cek log respons Fonnte di terminal server
     return result;
   } catch (error) {
-    console.error('Error sending WhatsApp via Fonnte:', error);
+    console.error('[WA EXCEPTION]', error);
     return null;
   }
 }
