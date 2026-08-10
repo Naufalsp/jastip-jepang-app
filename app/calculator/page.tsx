@@ -137,7 +137,7 @@ export default function PriceCalculatorPage() {
           <label className="block text-xs font-bold text-slate-700 uppercase">Input Barang &amp; Harga (Yen)</label>
           {items.map((item, idx) => (
             <div key={idx} className="flex flex-wrap sm:flex-nowrap gap-2 items-center bg-slate-50 sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0">
-              <input
+              {/* <input
                 type="text"
                 placeholder="Nama Barang (opsional)"
                 value={item.item_name}
@@ -147,7 +147,7 @@ export default function PriceCalculatorPage() {
                   setItems(updated);
                 }}
                 className="w-full sm:flex-1 border bg-white rounded-lg p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
+              /> */}
               <div className="flex gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-32">
                   <span className="absolute left-2.5 top-2.5 text-xs text-slate-400 font-bold">¥</span>
@@ -258,12 +258,12 @@ export default function PriceCalculatorPage() {
         </div>
       </div>
 
-      <Link
+      {/* <Link
         href="/order/new"
         className="block w-full bg-slate-900 text-white text-center font-bold text-xs sm:text-sm py-3.5 rounded-xl hover:bg-slate-800 active:scale-95 transition"
       >
         Buat Pesanan Sekarang →
-      </Link>
+      </Link> */}
     </div>
   );
 }
