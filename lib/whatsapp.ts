@@ -1,9 +1,22 @@
 // // lib/whatsapp.ts
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0')) {
-    cleaned = '62' + cleaned.slice(1);
+
+  // Jika diisi contoh: +818012345678 atau 818012345678 -> Biarkan 81
+  if (cleaned.startsWith('81') || cleaned.startsWith('62')) {
+    return cleaned;
   }
+
+  // Jika diisi format lokal Jepang (contoh: 08012345678 atau 09012345678)
+  if (cleaned.startsWith('080') || cleaned.startsWith('090') || cleaned.startsWith('070')) {
+    return '81' + cleaned.slice(1);
+  }
+
+  // Standar format lokal Indonesia (contoh: 08123456789)
+  if (cleaned.startsWith('0')) {
+    return '62' + cleaned.slice(1);
+  }
+
   return cleaned;
 }
 
