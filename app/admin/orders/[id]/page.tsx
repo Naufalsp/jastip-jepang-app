@@ -63,7 +63,7 @@ export default function AdminManageOrderPage() {
     try {
       setSaving(true);
 
-      // 1. Simpan Status Ketersediaan & Harga Yen masing-masing item
+      // 1. Simpan Status Ketersediaan & Harga Yen masing-masing item ke Supabase
       for (const item of items) {
         const { error: itemErr } = await supabase
           .from('order_items')
@@ -76,14 +76,22 @@ export default function AdminManageOrderPage() {
         if (itemErr) throw itemErr;
       }
 
-      // 2. Simpan Header Pesanan & Update Status ke 'menunggu_dp'
+      // 2. Cek ketersediaan item untuk menentukan status final order
+      const availableItems = items.filter(
+        (i) => i.availability_status === 'available'
+      );
+      
+      // Jika tidak ada barang yang tersedia sama sekali, set status 'tidak_ada_stok'
+      const targetStatus = availableItems.length === 0 ? 'tidak_ada_stok' : 'menunggu_dp';
+
+      // 3. Simpan Header Pesanan & Update Status
       const updatedOrderPayload = {
         total_weight_kg: totalWeightKg,
         total_items_price: currentPricing.totalItemsPriceIdr,
         total_jastip_fee: currentPricing.totalJastipFeeIdr,
         total_price: currentPricing.totalPriceIdr,
         dp_amount: currentPricing.dp75AmountIdr,
-        order_status: 'menunggu_dp',
+        order_status: targetStatus,
       };
 
       const { error: orderUpdateErr } = await supabase
@@ -93,7 +101,7 @@ export default function AdminManageOrderPage() {
 
       if (orderUpdateErr) throw orderUpdateErr;
 
-      // 3. Kirim WA Notification (Kondisi 2) via API Route Terpusat (/api/whatsapp)
+      // 4. Kirim WA Notification via API Route
       const fullOrderForWA = {
         ...order,
         ...updatedOrderPayload,
@@ -105,8 +113,10 @@ export default function AdminManageOrderPage() {
         body: JSON.stringify({
           type: 'status_or_verification',
           actionType: 'status_change',
-          newStatus: 'menunggu_dp',
+          newStatus: targetStatus, // Gunakan status dinamis
           order: fullOrderForWA,
+          orderItems: items,
+          items: items,
         }),
       });
 
