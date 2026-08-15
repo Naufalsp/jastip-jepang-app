@@ -1,9 +1,9 @@
+// // app/admin/page.tsx
 // 'use client';
 
 // import { useEffect, useState, useMemo } from 'react';
 // import Link from 'next/link';
 // import { supabase } from '@/lib/supabase';
-// import { triggerWAOnStatusOrVerificationChange } from '@/lib/whatsapp';
 
 // // Pemetaan Label Status untuk Admin Dashboard
 // const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -17,6 +17,27 @@
 //   diantar_ke_alamat: { label: 'Diantar Ke Alamat', color: 'bg-cyan-50 text-cyan-700 border-cyan-300' },
 //   barang_telah_diterima: { label: 'Barang Telah Diterima', color: 'bg-emerald-100 text-emerald-800 border-emerald-400' },
 // };
+
+// // HELPER KIRIM WA VIA API ROUTE (AMAN DARI BROWSER)
+// async function sendWANotification(order: any, nextStatus: string, actionType: string) {
+//   try {
+//     const res = await fetch('/api/whatsapp', {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({
+//         type: 'status_or_verification',
+//         order,
+//         newStatus: nextStatus,
+//         actionType,
+//       }),
+//     });
+//     if (!res.ok) {
+//       console.warn('Respon API WA tidak OK:', await res.json());
+//     }
+//   } catch (err) {
+//     console.error('Gagal memanggil API WhatsApp:', err);
+//   }
+// }
 
 // // Sub-komponen Verifikasi Pembayaran Admin (Dengan WA Otomatis)
 // function AdminOrderVerification({ order, onRefresh }: { order: any; onRefresh: () => void }) {
@@ -45,14 +66,15 @@
 
 //       if (type === 'dp') {
 //         updatePayload.dp_verified = true;
-//         updatePayload.order_status = 'menunggu_pelunasan';
+//         // Update status ke 'berangkat_dari_jepang' agar cocok dengan Kondisi 3
+//         updatePayload.order_status = 'berangkat_dari_jepang'; 
 //         actionType = 'verify_dp';
-//         nextStatus = 'menunggu_pelunasan';
+//         nextStatus = 'berangkat_dari_jepang';
 //       } else {
 //         updatePayload.final_verified = true;
-//         updatePayload.order_status = 'berangkat_dari_jepang';
+//         updatePayload.order_status = 'diantar_ke_alamat';
 //         actionType = 'verify_final';
-//         nextStatus = 'berangkat_dari_jepang';
+//         nextStatus = 'diantar_ke_alamat';
 //       }
 
 //       const { error } = await supabase
@@ -62,8 +84,9 @@
 
 //       if (error) throw error;
 
-//       // OTOMATIS KIRIM WA KONDISI 3 ATAU KONDISI 5
-//       triggerWAOnStatusOrVerificationChange(order, nextStatus, actionType).catch(console.error);
+//       // OTOMATIS KIRIM WA KONDISI 3 (DP VERIFIED) ATAU KONDISI 5 (FINAL VERIFIED) VIA API ROUTE
+//       const updatedOrder = { ...order, ...updatePayload };
+//       await sendWANotification(updatedOrder, nextStatus, actionType);
 
 //       setModalType(null);
 //       onRefresh();
@@ -204,7 +227,7 @@
 //     }
 //   }
 
-//   // UBAH STATUS PESANAN OLEH ADMIN (TERIKAT WA OTOMATIS)
+//   // UBAH STATUS PESANAN OLEH ADMIN
 //   const handleStatusChange = async (order: any, newStatus: string) => {
 //     try {
 //       const { error } = await supabase
@@ -214,8 +237,11 @@
 
 //       if (error) throw error;
 
-//       // OTOMATIS KIRIM WA KONDISI 2, KONDISI 4, ATAU KONDISI 6
-//       triggerWAOnStatusOrVerificationChange(order, newStatus, 'status_change').catch(console.error);
+//       // Panggil API route WhatsApp secara otomatis
+//       const updatedOrder = { ...order, order_status: newStatus };
+//       await sendWANotification(updatedOrder, newStatus, 'status_change');
+
+//       alert(`Status berhasil diperbarui ke "${STATUS_LABELS[newStatus]?.label || newStatus}" dan pesan WA pengingat pelunasan telah dikirim!`);
 
 //       fetchOrders();
 //     } catch (err: any) {
@@ -332,9 +358,18 @@
 //                   </div>
 
 //                   <div className="flex items-center gap-2">
-//                     <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${statusInfo.color}`}>
-//                       {statusInfo.label}
-//                     </span>
+//                     {/* Dropdown Pengubahan Status Cepat oleh Admin */}
+//                     <select
+//                       value={ord.order_status}
+//                       onChange={(e) => handleStatusChange(ord, e.target.value)}
+//                       className={`text-xs font-bold px-3 py-1.5 rounded-xl border cursor-pointer ${statusInfo.color}`}
+//                     >
+//                       {Object.entries(STATUS_LABELS).map(([key, item]) => (
+//                         <option key={key} value={key}>
+//                           {item.label}
+//                         </option>
+//                       ))}
+//                     </select>
 //                   </div>
 //                 </div>
 
@@ -348,7 +383,7 @@
 //                       {ord.package_type === 'titip_kirim' ? 'Total Berat' : 'Total Harga Barang'}
 //                     </p>
 //                     <p className="font-bold text-slate-800">
-//                       {ord.package_type === 'titip_kirim' ? `${ord.total_weight || 0} kg` : formatRupiah(ord.total_items_price)}
+//                       {ord.package_type === 'titip_kirim' ? `${ord.total_weight_kg || ord.total_weight || 0} kg` : formatRupiah(ord.total_items_price)}
 //                     </p>
 //                   </div>
 //                   <div>
@@ -406,7 +441,6 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   barang_telah_diterima: { label: 'Barang Telah Diterima', color: 'bg-emerald-100 text-emerald-800 border-emerald-400' },
 };
 
-// HELPER KIRIM WA VIA API ROUTE (AMAN DARI BROWSER)
 async function sendWANotification(order: any, nextStatus: string, actionType: string) {
   try {
     const res = await fetch('/api/whatsapp', {
@@ -419,15 +453,12 @@ async function sendWANotification(order: any, nextStatus: string, actionType: st
         actionType,
       }),
     });
-    if (!res.ok) {
-      console.warn('Respon API WA tidak OK:', await res.json());
-    }
+    if (!res.ok) console.warn('Respon API WA tidak OK:', await res.json());
   } catch (err) {
     console.error('Gagal memanggil API WhatsApp:', err);
   }
 }
 
-// Sub-komponen Verifikasi Pembayaran Admin (Dengan WA Otomatis)
 function AdminOrderVerification({ order, onRefresh }: { order: any; onRefresh: () => void }) {
   const [modalType, setModalType] = useState<'dp' | 'final' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -454,7 +485,6 @@ function AdminOrderVerification({ order, onRefresh }: { order: any; onRefresh: (
 
       if (type === 'dp') {
         updatePayload.dp_verified = true;
-        // Update status ke 'berangkat_dari_jepang' agar cocok dengan Kondisi 3
         updatePayload.order_status = 'berangkat_dari_jepang'; 
         actionType = 'verify_dp';
         nextStatus = 'berangkat_dari_jepang';
@@ -472,7 +502,6 @@ function AdminOrderVerification({ order, onRefresh }: { order: any; onRefresh: (
 
       if (error) throw error;
 
-      // OTOMATIS KIRIM WA KONDISI 3 (DP VERIFIED) ATAU KONDISI 5 (FINAL VERIFIED) VIA API ROUTE
       const updatedOrder = { ...order, ...updatePayload };
       await sendWANotification(updatedOrder, nextStatus, actionType);
 
@@ -615,7 +644,6 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // UBAH STATUS PESANAN OLEH ADMIN
   const handleStatusChange = async (order: any, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -625,11 +653,10 @@ export default function AdminDashboardPage() {
 
       if (error) throw error;
 
-      // Panggil API route WhatsApp secara otomatis
       const updatedOrder = { ...order, order_status: newStatus };
       await sendWANotification(updatedOrder, newStatus, 'status_change');
 
-      alert(`Status berhasil diperbarui ke "${STATUS_LABELS[newStatus]?.label || newStatus}" dan pesan WA pengingat pelunasan telah dikirim!`);
+      alert(`Status berhasil diperbarui ke "${STATUS_LABELS[newStatus]?.label || newStatus}"!`);
 
       fetchOrders();
     } catch (err: any) {
@@ -638,6 +665,46 @@ export default function AdminDashboardPage() {
   };
 
   const formatRupiah = (val: number) => `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
+
+  // -------------------------------------------------------------
+  // RINGKASAN KEUANGAN OTOMATIS (YEN & RUPIAH DP / LUNAS)
+  // -------------------------------------------------------------
+  const financialSummary = useMemo(() => {
+    let totalJpyAvailablePaid = 0;
+    let totalIdrDpPaid = 0;
+    let totalIdrLunasPaid = 0;
+
+    orders.forEach((ord) => {
+      const isPaidAtLeastDp = Boolean(ord.dp_verified || ord.final_verified);
+
+      // 1. Kumpulkan Nominal Yen HANYA dari barang yang AVAILABLE & Sudah Terbayar
+      if (isPaidAtLeastDp && Array.isArray(ord.order_items)) {
+        ord.order_items.forEach((item: any) => {
+          const status = String(item.availability_status || '').toLowerCase();
+          if (status === 'available' || status === 'tersedia') {
+            const priceJpy = Number(item.item_price_jpy) || 0;
+            const qty = Number(item.quantity) || 1;
+            totalJpyAvailablePaid += priceJpy * qty;
+          }
+        });
+      }
+
+      // 2. Kumpulkan Nominal Rupiah Sesuai Tahap Pembayaran
+      if (ord.final_verified) {
+        // Jika sudah Lunas
+        totalIdrLunasPaid += Number(ord.total_price) || 0;
+      } else if (ord.dp_verified) {
+        // Jika baru bayar DP
+        totalIdrDpPaid += Number(ord.dp_amount) || 0;
+      }
+    });
+
+    return {
+      totalJpyAvailablePaid,
+      totalIdrDpPaid,
+      totalIdrLunasPaid,
+    };
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
@@ -683,6 +750,45 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
+        {/* ============================================================== */}
+        {/* WIDGET RINGKASAN KEUANGAN MASUK                                */}
+        {/* ============================================================== */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Total Yen Barang Available */}
+          <div className="bg-slate-900 text-white p-5 rounded-3xl space-y-1 shadow-sm border border-slate-800">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              🇯🇵 Belanjaan Yen (Available & Terbayar)
+            </span>
+            <p className="text-2xl font-black text-amber-400">
+              ¥ {financialSummary.totalJpyAvailablePaid.toLocaleString('ja-JP')}
+            </p>
+            <p className="text-[10px] text-slate-400">Total modal Yen untuk barang yang siap dibeli</p>
+          </div>
+
+          {/* Card 2: Total Rupiah Masuk (DP) */}
+          <div className="bg-white p-5 rounded-3xl space-y-1 shadow-sm border border-amber-200 bg-amber-50/50">
+            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
+              💳 Nominal Rupiah Masuk (Status DP)
+            </span>
+            <p className="text-xl font-black text-amber-800">
+              {formatRupiah(financialSummary.totalIdrDpPaid)}
+            </p>
+            <p className="text-[10px] text-amber-600/80">Total uang DP terverifikasi (Belum Pelunasan)</p>
+          </div>
+
+          {/* Card 3: Total Rupiah Masuk (Lunas) */}
+          <div className="bg-white p-5 rounded-3xl space-y-1 shadow-sm border border-emerald-200 bg-emerald-50/50">
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
+              ✅ Nominal Rupiah Masuk (Status Lunas)
+            </span>
+            <p className="text-xl font-black text-emerald-800">
+              {formatRupiah(financialSummary.totalIdrLunasPaid)}
+            </p>
+            <p className="text-[10px] text-emerald-600/80">Total uang pesanan yang sudah lunas sepenuhnya</p>
+          </div>
+        </div>
+
+        {/* Tab & Filter */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
           <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
             <button
@@ -725,6 +831,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Daftar Pesanan */}
         <div className="space-y-4">
           {filteredOrders.map((ord) => {
             const statusInfo = STATUS_LABELS[ord.order_status] || {
@@ -746,7 +853,6 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Dropdown Pengubahan Status Cepat oleh Admin */}
                     <select
                       value={ord.order_status}
                       onChange={(e) => handleStatusChange(ord, e.target.value)}
